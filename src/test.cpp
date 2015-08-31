@@ -10,12 +10,10 @@
 #include <complex>
 
 #ifndef USE_CUDA
-#	include <cblas.h>
+#	include "cblas.h"
 #else
 #	include "kernels.cuh"
 #endif
-
-#include <windows.h>
 
 #include "aladin/aladin.h"
 
@@ -29,74 +27,76 @@ struct Sizes
 class Timer
 {
 private:
-	//typedef std::chrono::high_resolution_clock my_clock;
-	//typedef std::chrono::time_point<my_clock> time_point;
-	//typedef std::chrono::duration<int> duration_t;
+	typedef std::chrono::high_resolution_clock my_clock;
+	typedef std::chrono::time_point<my_clock> time_point;
+	typedef std::chrono::duration<double> duration_t;
 public:
 	Timer()
 	{
-		QueryPerformanceFrequency(&freq);
+		tick();
 	}
 	void tick()
 	{
-		QueryPerformanceCounter(&start);
+		start = my_clock::now();
 	}
 	double tack()const
 	{
-		LARGE_INTEGER end;
-		QueryPerformanceCounter(&end);
-		return (double)(end.QuadPart - start.QuadPart)/freq.QuadPart;
+		duration_t elapsed_seconds = my_clock::now() - start;
+		return elapsed_seconds.count();
 	}
 
 private:
-	LARGE_INTEGER start;
-	LARGE_INTEGER freq;
+	time_point start;
 };
 
 template<class Type>
-void calculate_prod_reference(const Sizes& sizes, const Type* A, const Type* B, Type* C2);
+void calculate_prod_reference(const Sizes& sizes, const Type* A, const Type* B, Type* C2, bool transpose);
 
 template<>
-void calculate_prod_reference<double>(const Sizes& sizes, const double* A, const double* B, double* C2)
+void calculate_prod_reference<double>(const Sizes& sizes, const double* A, const double* B, double* C2, bool transpose)
 {
 
-	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, sizes.row1, sizes.col2, sizes.col1, 1.0, A, sizes.col1, B, sizes.col2, 0.0, C2, sizes.col2);
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, transpose ? CblasTrans : CblasNoTrans,
+		sizes.row1, sizes.col2, sizes.col1, 1.0, A, sizes.col1, B, sizes.col2, 0.0, C2, sizes.col2);
 }
 
 template<>
-void calculate_prod_reference<float>(const Sizes& sizes, const float* A, const float* B, float* C2)
+void calculate_prod_reference<float>(const Sizes& sizes, const float* A, const float* B, float* C2, bool transpose)
 {
-	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, sizes.row1, sizes.col2, sizes.col1, 1.0, A, sizes.col1, B, sizes.col2, 0.0, C2, sizes.col2);
+	cblas_sgemm(CblasRowMajor, CblasNoTrans, transpose ? CblasTrans : CblasNoTrans,
+		sizes.row1, sizes.col2, sizes.col1, 1.0, A, sizes.col1, B, sizes.col2, 0.0, C2, sizes.col2);
 }
 
 template<>
-void calculate_prod_reference<std::complex<float>>(const Sizes& sizes, const std::complex<float>* A, const std::complex<float>* B, std::complex<float>* C2)
+void calculate_prod_reference<std::complex<float>>(const Sizes& sizes, const std::complex<float>* A, const std::complex<float>* B, std::complex<float>* C2, bool transpose)
 {
 	float alpha = 1.0;
 	float beta = 0.0;
-	cblas_cgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, sizes.row1, sizes.col2, sizes.col1, &alpha, A->_Val, sizes.col1, B->_Val, sizes.col2, &beta, C2->_Val, sizes.col2);
+	cblas_cgemm(CblasRowMajor, CblasNoTrans, transpose ? CblasTrans : CblasNoTrans,
+		sizes.row1, sizes.col2, sizes.col1, &alpha, A->_Val, sizes.col1, B->_Val, sizes.col2, &beta, C2->_Val, sizes.col2);
 }
 
 template<>
-void calculate_prod_reference<std::complex<double>>(const Sizes& sizes, const std::complex<double>* A, const std::complex<double>* B, std::complex<double>* C2)
+void calculate_prod_reference<std::complex<double>>(const Sizes& sizes, const std::complex<double>* A, const std::complex<double>* B, std::complex<double>* C2, bool transpose)
 {
 	double alpha = 1.0;
 	double beta = 0.0;
-	cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, sizes.row1, sizes.col2, sizes.col1, &alpha, A->_Val, sizes.col1, B->_Val, sizes.col2, &beta, C2->_Val, sizes.col2);
+	cblas_zgemm(CblasRowMajor, CblasNoTrans, transpose ? CblasTrans : CblasNoTrans,
+		sizes.row1, sizes.col2, sizes.col1, &alpha, A->_Val, sizes.col1, B->_Val, sizes.col2, &beta, C2->_Val, sizes.col2);
 }
 
 template<>
-void calculate_prod_reference<short>(const Sizes& sizes, const short* A, const short* B, short* C2)
+void calculate_prod_reference<short>(const Sizes& sizes, const short* A, const short* B, short* C2, bool transpose)
 {
 }
 
 template<>
-void calculate_prod_reference<int>(const Sizes& sizes, const int* A, const int* B, int* C2)
+void calculate_prod_reference<int>(const Sizes& sizes, const int* A, const int* B, int* C2, bool transpose)
 {
 }
 
 template<>
-void calculate_prod_reference<long long>(const Sizes& sizes, const long long* A, const long long* B, long long* C2)
+void calculate_prod_reference<long long>(const Sizes& sizes, const long long* A, const long long* B, long long* C2, bool transpose)
 {
 }
 
@@ -250,10 +250,10 @@ void prod_test(TestEntry& result)
 	Timer timer;
 	auto sizes = result.sizes;
 
-	std::vector<double> calculation_times(result.epochs);
-	std::vector<double> baseline_times(result.epochs);
+	std::vector<double> calculation_times;
+	std::vector<double> baseline_times;
 
-	std::vector<double> checking_errors(result.epochs);
+	std::vector<double> checking_errors;
 
 #ifndef USE_CUDA
 	openblas_set_num_threads(result.threads);
@@ -280,15 +280,17 @@ void prod_test(TestEntry& result)
 				[](Type& one, const Type& other){one += other;}, [](const Type& one, const Type& other){return one*other;},
 				result.threads);
 		}
-		calculation_times[e] = timer.tack();
+		calculation_times.push_back(timer.tack());
 
 		timer.tick();
-		calculate_prod_reference(sizes, A, B, C2);
-		baseline_times[e] = timer.tack();
+		calculate_prod_reference(sizes, A, B, C2, result.transpose);
+		baseline_times.push_back(timer.tack());
 
-		checking_errors[e] = check_reference(sizes, C1, C2);
+		checking_errors.push_back(check_reference(sizes, C1, C2));
 
+		std::cerr << '\r' << Mean(calculation_times) << '\t' << Mean(baseline_times) << '\t' << Mean(checking_errors) << '\t';
 	}
+	std::cerr << std::endl;
 
 	result.aladin_time = Mean(calculation_times);
 	result.blas_time = Mean(baseline_times);
@@ -318,13 +320,13 @@ int main(int argc, char* argv[])
 	{
 		if (strcmp(*argv, "-s") == 0)
 		{
-			int n = 0; //number of integers after -s flag and before any other flag
+			int n = 0; //number of integers after -s flag until any other flag
 			std::vector<int> s(argc);
-			while (*argv != NULL && (s[n] = atoi(*++argv)) > 0)
+			while (argv[1] != NULL && (s[n] = atoi(argv[1])) > 0)
 			{
 				++n;
+				++argv;
 			}
-			--argv;
 			if (n == 1)
 			{
 				test.sizes.row1 = test.sizes.col1 = test.sizes.col2 = s[0];

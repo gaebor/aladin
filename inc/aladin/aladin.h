@@ -18,7 +18,7 @@
 
 
 #ifndef min
-#	define min(x,y) ((x) < (y)) ? (x) : (y)
+#	define min(x,y) (((x) < (y)) ? (x) : (y))
 #	define MIN_HAS_BEEN_DEFINED_IN_ALADIN
 #endif
 
