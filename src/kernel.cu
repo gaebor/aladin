@@ -1,91 +1,102 @@
 #include "kernels.cuh"
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
 
-cudaError_t addWithCuda(int *c, const int *a, const int *b, unsigned int size);
-
-__global__ void addKernel(int *c, const int *a, const int *b)
-{
-    int i = threadIdx.x;
-    c[i] = a[i] + b[i];
+#define DEFINE_KERNEL_MACRO_TRANSPOSE(type, name)\
+__global__ void dot_kernel_##name(const type *a, const type *b, type *c, int row_a, int col_a_row_b, int col_b) \
+{                                                      \
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;   \
+	int i;                                             \
+	const int target_row = idx / col_b;                \
+	const int target_col = idx % col_b;                \
+	if (idx >= row_a*col_b)                            \
+		return;                                        \
+	c += idx;                                          \
+	*c = 0;                                            \
+	a += target_row*col_a_row_b;                       \
+	b += target_col*col_b;                             \
+	for (i = 0; i < col_a_row_b; ++i, a += 1, b += 1)  \
+		*c += *a + *b;                                 \
 }
 
-// Helper function for using CUDA to add vectors in parallel.
-cudaError_t addWithCuda(int *c, const int *a, const int *b, unsigned int size)
-{
-    int *dev_a = 0;
-    int *dev_b = 0;
-    int *dev_c = 0;
-    cudaError_t cudaStatus;
-
-    // Choose which GPU to run on, change this on a multi-GPU system.
-    cudaStatus = cudaSetDevice(0);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?");
-        goto Error;
-    }
-
-    // Allocate GPU buffers for three vectors (two input, one output)    .
-    cudaStatus = cudaMalloc((void**)&dev_c, size * sizeof(int));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
-
-    cudaStatus = cudaMalloc((void**)&dev_a, size * sizeof(int));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
-
-    cudaStatus = cudaMalloc((void**)&dev_b, size * sizeof(int));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
-
-    // Copy input vectors from host memory to GPU buffers.
-    cudaStatus = cudaMemcpy(dev_a, a, size * sizeof(int), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
-
-    cudaStatus = cudaMemcpy(dev_b, b, size * sizeof(int), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
-
-    // Launch a kernel on the GPU with one thread for each element.
-    addKernel<<<1, size>>>(dev_c, dev_a, dev_b);
-
-    // Check for any errors launching the kernel
-    cudaStatus = cudaGetLastError();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "addKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
-        goto Error;
-    }
-    
-    // cudaDeviceSynchronize waits for the kernel to finish, and returns
-    // any errors encountered during the launch.
-    cudaStatus = cudaDeviceSynchronize();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
-        goto Error;
-    }
-
-    // Copy output vector from GPU buffer to host memory.
-    cudaStatus = cudaMemcpy(c, dev_c, size * sizeof(int), cudaMemcpyDeviceToHost);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
-
-Error:
-    cudaFree(dev_c);
-    cudaFree(dev_a);
-    cudaFree(dev_b);
-    
-    return cudaStatus;
+#define DEFINE_KERNEL_MACRO(type, name)\
+__global__ void dot_kernel_##name(const type *a, const type *b, type *c, int row_a, int col_a_row_b, int col_b) \
+{                                                      \
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;   \
+	int i;                                             \
+	const int target_row = idx / col_b;                \
+	const int target_col = idx % col_b;                \
+	if (idx >= row_a*col_b)                            \
+		return;                                        \
+	c += idx;                                          \
+	*c = 0;                                            \
+	a += target_row*col_a_row_b;                       \
+	b += target_col;                                   \
+	for (i = 0; i < col_a_row_b; ++i, a+=1, b+=col_b)  \
+		*c += *a + *b;                                 \
 }
+
+#define CALL_CUDA_MACRO(type, name) \
+DEFINE_KERNEL_MACRO(type, name##_) \
+DEFINE_KERNEL_MACRO_TRANSPOSE(type, name##_transpose) \
+void call_cuda_kernel_##name##_(int blocks, const type *a, const type *b, type *c, int row_a, int col_a_row_b, int col_b) \
+{dot_kernel_##name##_<<<blocks, 256>> >(a, b, c, row_a, col_a_row_b, col_b);}\
+void call_cuda_kernel_##name##_transpose(int blocks, const type *a, const type *b, type *c, int row_a, int col_a_row_b, int col_b) \
+{dot_kernel_##name##_transpose<<<blocks, 256>> >(a, b, c, row_a, col_a_row_b, col_b);}
+
+CALL_CUDA_MACRO(float, float)
+CALL_CUDA_MACRO(double, double)
+CALL_CUDA_MACRO(long long, longlong)
+CALL_CUDA_MACRO(short, short)
+CALL_CUDA_MACRO(int, int)
+
+#define DEFINE_KERNEL_MACRO_COMPLEX_TRANSPOSE(type, name)\
+__global__ void dot_kernel_##name(const type *a, const type *b, type *c, int row_a, int col_a_row_b, int col_b) \
+{                                                      \
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;   \
+	int i;                                             \
+	const int target_row = idx / col_b;                \
+	const int target_col = idx % col_b;                \
+	if (idx >= row_a*col_b)                            \
+		return;                                        \
+	c += idx*2;                                        \
+	c[0] = 0;                                          \
+	c[1] = 0;                                          \
+	a += target_row*col_a_row_b*2;                     \
+	b += target_col*col_b*2;                           \
+	for (i = 0; i < col_a_row_b; ++i, a += 2, b += 2)  \
+	{                                                  \
+		c[0] += a[0] * b[0] - a[1] * b[1];             \
+		c[1] += a[1] * b[0] + a[0] * b[1];             \
+	}                                                  \
+}
+
+#define DEFINE_KERNEL_MACRO_COMPLEX(type, name)\
+__global__ void dot_kernel_##name(const type *a, const type *b, type *c, int row_a, int col_a_row_b, int col_b) \
+{                                                      \
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;   \
+	int i;                                             \
+	const int target_row = idx / col_b;                \
+	const int target_col = idx % col_b;                \
+	if (idx >= row_a*col_b)                            \
+		return;                                        \
+	c += idx*2;                                        \
+	c[0] = 0;                                          \
+	c[1] = 0;                                          \
+	a += target_row*col_a_row_b*2;                     \
+	b += target_col*2;                                 \
+	for (i = 0; i < col_a_row_b; ++i, a+=2, b+=col_b*2)\
+	{                                                  \
+		c[0] += a[0] * b[0] - a[1] * b[1];             \
+		c[1] += a[1] * b[0] + a[0] * b[1];             \
+	}                                                  \
+}
+
+#define CALL_CUDA_MACRO_COMPLEX(type, name) \
+DEFINE_KERNEL_MACRO_COMPLEX(type, name##_) \
+DEFINE_KERNEL_MACRO_COMPLEX_TRANSPOSE(type, name##_transpose) \
+void call_cuda_kernel_##name##_(int blocks, const std::complex<type> *a, const std::complex<type> *b, std::complex<type> *c, int row_a, int col_a_row_b, int col_b) \
+{dot_kernel_##name##_<<<blocks, 256>> >(reinterpret_cast<const type*>(a), reinterpret_cast<const type*>(b), reinterpret_cast<type*>(c), row_a, col_a_row_b, col_b);}\
+void call_cuda_kernel_##name##_transpose(int blocks, const std::complex<type> *a, const std::complex<type> *b, std::complex<type> *c, int row_a, int col_a_row_b, int col_b) \
+{dot_kernel_##name##_transpose<<<blocks, 256>> >(reinterpret_cast<const type*>(a), reinterpret_cast<const type*>(b), reinterpret_cast<type*>(c), row_a, col_a_row_b, col_b);}
+
+CALL_CUDA_MACRO_COMPLEX(float, complex)
+CALL_CUDA_MACRO_COMPLEX(double, complexdouble)

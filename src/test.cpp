@@ -5,9 +5,10 @@
 //#include <complex>
 
 #include <iostream>
-#include <chrono>
 #include <random>
 #include <complex>
+
+#include "common.h"
 
 #ifndef USE_CUDA
 #	include "cblas.h"
@@ -17,37 +18,7 @@
 
 #include "aladin/aladin.h"
 
-struct Sizes
-{
-	int row1, col1, col2;
-};
-
-
-
-class Timer
-{
-private:
-	typedef std::chrono::high_resolution_clock my_clock;
-	typedef std::chrono::time_point<my_clock> time_point;
-	typedef std::chrono::duration<double> duration_t;
-public:
-	Timer()
-	{
-		tick();
-	}
-	void tick()
-	{
-		start = my_clock::now();
-	}
-	double tack()const
-	{
-		duration_t elapsed_seconds = my_clock::now() - start;
-		return elapsed_seconds.count();
-	}
-
-private:
-	time_point start;
-};
+#ifndef USE_CUDA
 
 template<class Type>
 void calculate_prod_reference(const Sizes& sizes, const Type* A, const Type* B, Type* C2, bool transpose);
@@ -55,7 +26,6 @@ void calculate_prod_reference(const Sizes& sizes, const Type* A, const Type* B, 
 template<>
 void calculate_prod_reference<double>(const Sizes& sizes, const double* A, const double* B, double* C2, bool transpose)
 {
-
 	cblas_dgemm(CblasRowMajor, CblasNoTrans, transpose ? CblasTrans : CblasNoTrans,
 		sizes.row1, sizes.col2, sizes.col1, 1.0, A, sizes.col1, B, sizes.col2, 0.0, C2, sizes.col2);
 }
@@ -99,6 +69,8 @@ template<>
 void calculate_prod_reference<long long>(const Sizes& sizes, const long long* A, const long long* B, long long* C2, bool transpose)
 {
 }
+
+#endif
 
 template<class Type>
 double check_reference(const Sizes& sizes, const Type* X1, const Type* X2)
@@ -255,16 +227,43 @@ void prod_test(TestEntry& result)
 
 	std::vector<double> checking_errors;
 
+	Type *A, *B, *C1, *C2;
+
 #ifndef USE_CUDA
 	openblas_set_num_threads(result.threads);
+
+	A = new Type[sizes.row1*sizes.col1];
+	B = new Type[sizes.col1*sizes.col2];
+	C1 = new Type[sizes.row1*sizes.col2];
+	C2 = new Type[sizes.row1*sizes.col2];
 #else
 
+	cudaError_t cuda_error;
+	cuda_error = cudaHostAlloc(&A, sizeof(Type)*sizes.row1*sizes.col1, cudaHostAllocDefault);
+	if (cuda_error != cudaSuccess)
+	{
+		std::cerr << "Unable to allocate pinned memory" << std::endl;
+		return;
+	}
+	cuda_error = cudaHostAlloc(&B, sizeof(Type)*sizes.col1*sizes.col2, cudaHostAllocDefault);
+	if (cuda_error != cudaSuccess)
+	{
+		std::cerr << "Unable to allocate pinned memory" << std::endl;
+		return;
+	}
+	cuda_error = cudaHostAlloc(&C1, sizeof(Type)*sizes.row1*sizes.col2, cudaHostAllocDefault);
+	if (cuda_error != cudaSuccess)
+	{
+		std::cerr << "Unable to allocate pinned memory" << std::endl;
+		return;
+	}
+	cuda_error = cudaHostAlloc(&C2, sizeof(Type)*sizes.row1*sizes.col2, cudaHostAllocDefault);
+	if (cuda_error != cudaSuccess)
+	{
+		std::cerr << "Unable to allocate pinned memory" << std::endl;
+		return;
+	}
 #endif
-
-	auto A = new Type[sizes.row1*sizes.col1];
-	auto B = new Type[sizes.col1*sizes.col2];
-	auto C1 = new Type[sizes.row1*sizes.col2];
-	auto C2 = new Type[sizes.row1*sizes.col2];
 
 	for (size_t e = 0; e < result.epochs; ++e)
 	{
@@ -315,6 +314,14 @@ int main(int argc, char* argv[])
 	std::string type = "double";
 	
 	++argv; //name of executable
+
+#ifdef USE_CUDA
+	if (cudaSetDevice(0) != cudaSuccess)
+	{
+		std::cerr << "unable to select graphic card!" << std::endl;
+		return -1;
+	}
+#endif
 
 	for( ; *argv != NULL; ++argv)
 	{
