@@ -73,7 +73,7 @@ void calculate_prod_reference<std::complex<float>>(const Sizes& sizes, const std
 	float alpha = 1.0;
 	float beta = 0.0;
 	cblas_cgemm(CblasRowMajor, CblasNoTrans, transpose ? CblasTrans : CblasNoTrans,
-		sizes.row1, sizes.col2, sizes.col1, &alpha, A->_Val, sizes.col1, B->_Val, sizes.col2, &beta, C2->_Val, sizes.col2);
+		sizes.row1, sizes.col2, sizes.col1, &alpha, reinterpret_cast<const float*>(A), sizes.col1, reinterpret_cast<const float*>(B), sizes.col2, &beta, C2->_Val, sizes.col2);
 }
 
 template<>
@@ -82,7 +82,7 @@ void calculate_prod_reference<std::complex<double>>(const Sizes& sizes, const st
 	double alpha = 1.0;
 	double beta = 0.0;
 	cblas_zgemm(CblasRowMajor, CblasNoTrans, transpose ? CblasTrans : CblasNoTrans,
-		sizes.row1, sizes.col2, sizes.col1, &alpha, A->_Val, sizes.col1, B->_Val, sizes.col2, &beta, C2->_Val, sizes.col2);
+		sizes.row1, sizes.col2, sizes.col1, &alpha, reinterpret_cast<const double*>(A), sizes.col1, reinterpret_cast<const double*>(B), sizes.col2, &beta, C2->_Val, sizes.col2);
 }
 
 template<>
