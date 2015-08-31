@@ -139,9 +139,9 @@ size_t solve(const MatrixHeader<Number> mat,
 	const Number AdditiveIdentity, const Number MultiplicativeIdentity,
 	Mul Multiply, Inverse inv_f, Subtract sub_f)
 {
-	for (size_t i = 0; i < min(rows, cols); ++i)
+	for (size_t i = 0; i < min(mat.rows, mat.cols); ++i)
 	{
-		auto& pivot = TakePosition::at(mat, i, i, rows, cols);
+		auto& pivot = mat(i,i);
 
 		if ( pivot == AdditiveIdentity)
 		{
@@ -151,22 +151,22 @@ size_t solve(const MatrixHeader<Number> mat,
 
 		const Number multiplier = inv_f(pivot);
 		pivot = MultiplicativeIdentity;
-		for (size_t k = i+1; k < cols; ++k)
-			TakePosition::at(mat, i, k, rows, cols) = Multiply(TakePosition::at(mat, i, k, rows, cols), multiplier);
+		for (size_t k = i+1; k < mat.cols; ++k)
+			mat(i, k) = Multiply(mat(i, k), multiplier);
 
-		for (size_t j = 0; j < rows; ++j)
+		for (size_t j = 0; j < mat.rows; ++j)
 		{
-			auto& thisElement = TakePosition::at(mat, j, i, rows, cols);
+			auto& thisElement = mat(j, i);
 			if (j == i)
 				continue;
 			
-			for (size_t k = i+1; k < cols; ++k)
-				TakePosition::at(mat, j, k, rows, cols) = sub_f(TakePosition::at(mat, j, k, rows, cols), MyField::Multiply(thisElement, TakePosition::at(mat, i, k, rows, cols)));
+			for (size_t k = i+1; k < mat.cols; ++k)
+				mat(j, k) = sub_f(mat(j, k), Multiply(thisElement, mat(i, k)));
 
 			thisElement = AdditiveIdentity;
 		}
 	}
-	return min(rows, cols);
+	return min(mat.rows, mat.cols);
 }
 
 ////!gaussian elimination
