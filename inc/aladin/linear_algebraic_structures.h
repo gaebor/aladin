@@ -51,55 +51,55 @@ namespace aladin
 		return MatrixHeader<Number>(p, r, c, r_s, c_s);
 	}
 
-	template<class Number, template <class > class MyRing = RingProxy>
-	class Matrix
-	{
-	public:
-		typedef MyRing<Number> Ring;
-		Matrix(size_t i, size_t j, const Number& value = Ring::AdditiveIdentity())
-		:	elements(new Number[i*j]), isResponsible(true), rows(i), cols(j)
-		{
-			Number* elem = elements;
-			for (size_t n = 0; n < rows*cols; ++n, ++elem)
-			{
-				*elem = value;
-			}
-		}
-		Matrix(size_t i, size_t j, Number* value_ptr)
-			:	elements(value_ptr), isResponsible(false), rows(i), cols(j)
-		{
-		}
-		Matrix(const Matrix& other)
-			:	elements(new Number[other.rows * other.cols]), isResponsible(true), rows(other.rows), cols(other.cols)
-		{
-			memcpy(elements, other.elements, sizeof(Number)*rows*cols);
-		}
-		Matrix& operator= (Matrix&& other)
-		{
-			if (isResponsible)
-				delete[] elements;
+	//template<class Number, template <class > class MyRing = RingProxy>
+	//class Matrix
+	//{
+	//public:
+	//	typedef MyRing<Number> Ring;
+	//	Matrix(size_t i, size_t j, const Number& value = Ring::AdditiveIdentity())
+	//	:	elements(new Number[i*j]), isResponsible(true), rows(i), cols(j)
+	//	{
+	//		Number* elem = elements;
+	//		for (size_t n = 0; n < rows*cols; ++n, ++elem)
+	//		{
+	//			*elem = value;
+	//		}
+	//	}
+	//	Matrix(size_t i, size_t j, Number* value_ptr)
+	//		:	elements(value_ptr), isResponsible(false), rows(i), cols(j)
+	//	{
+	//	}
+	//	Matrix(const Matrix& other)
+	//		:	elements(new Number[other.rows * other.cols]), isResponsible(true), rows(other.rows), cols(other.cols)
+	//	{
+	//		memcpy(elements, other.elements, sizeof(Number)*rows*cols);
+	//	}
+	//	Matrix& operator= (Matrix&& other)
+	//	{
+	//		if (isResponsible)
+	//			delete[] elements;
 
-			elements = other.elements;
-			isResponsible = other.isResponsible;
-			rows = other.rows;
-			cols = other.cols;
-			other.isResponsible = false;
-		}
-		~Matrix()
-		{
-			if (isResponsible)
-				delete[] elements;
-		}
-		Number& operator()(size_t i, size_t j)
-		{
-			return elements[i*cols + j];
-		}
-	private:
-		Number* elements;
-		size_t rows;
-		size_t cols;
-		bool isResponsible;
-	};
+	//		elements = other.elements;
+	//		isResponsible = other.isResponsible;
+	//		rows = other.rows;
+	//		cols = other.cols;
+	//		other.isResponsible = false;
+	//	}
+	//	~Matrix()
+	//	{
+	//		if (isResponsible)
+	//			delete[] elements;
+	//	}
+	//	Number& operator()(size_t i, size_t j)
+	//	{
+	//		return elements[i*cols + j];
+	//	}
+	//private:
+	//	Number* elements;
+	//	size_t rows;
+	//	size_t cols;
+	//	bool isResponsible;
+	//};
 }
 
 #endif
