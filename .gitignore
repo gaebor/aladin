@@ -2,6 +2,18 @@
 Thumbs.db
 ehthumbs.db
 
+#Visual Studio
+*.tlog
+windows/bin/*
+
+#binaries
+*.exp
+*.obj
+*.pdb
+
+#doxy
+doxy/html/*
+
 # Folder config file
 Desktop.ini
 
