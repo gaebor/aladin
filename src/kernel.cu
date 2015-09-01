@@ -1,4 +1,4 @@
-#include "kernels.cuh"
+#include<complex>
 
 #define DEFINE_KERNEL_MACRO_TRANSPOSE(type, name)\
 __global__ void dot_kernel_##name(const type *a, const type *b, type *c, int row_a, int col_a_row_b, int col_b) \
@@ -94,9 +94,9 @@ __global__ void dot_kernel_##name(const type *a, const type *b, type *c, int row
 DEFINE_KERNEL_MACRO_COMPLEX(type, name##_) \
 DEFINE_KERNEL_MACRO_COMPLEX_TRANSPOSE(type, name##_transpose) \
 void call_cuda_kernel_##name##_(int blocks, const std::complex<type> *a, const std::complex<type> *b, std::complex<type> *c, int row_a, int col_a_row_b, int col_b) \
-{dot_kernel_##name##_<<<blocks, 256>> >(reinterpret_cast<const type*>(a), reinterpret_cast<const type*>(b), reinterpret_cast<type*>(c), row_a, col_a_row_b, col_b);}\
+{dot_kernel_##name##_<<<blocks, 256>>>(reinterpret_cast<const type*>(a), reinterpret_cast<const type*>(b), reinterpret_cast<type*>(c), row_a, col_a_row_b, col_b);}\
 void call_cuda_kernel_##name##_transpose(int blocks, const std::complex<type> *a, const std::complex<type> *b, std::complex<type> *c, int row_a, int col_a_row_b, int col_b) \
-{dot_kernel_##name##_transpose<<<blocks, 256>> >(reinterpret_cast<const type*>(a), reinterpret_cast<const type*>(b), reinterpret_cast<type*>(c), row_a, col_a_row_b, col_b);}
+{dot_kernel_##name##_transpose<<<blocks, 256>>>(reinterpret_cast<const type*>(a), reinterpret_cast<const type*>(b), reinterpret_cast<type*>(c), row_a, col_a_row_b, col_b);}
 
 CALL_CUDA_MACRO_COMPLEX(float, complex)
 CALL_CUDA_MACRO_COMPLEX(double, complexdouble)

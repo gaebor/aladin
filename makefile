@@ -1,16 +1,14 @@
-CC = gcc
-CPP = g++
 CFLAGS = -Iinc -lm -std=c++11 -O3 -march=native -Wall
-SOURCE=src
+CUDA_FLAGS = -Iinc -lm -std=c++11 -O3
 apps = test test_cuda
 
 all: $(apps)
 
 test: src/test.cpp
-	$(CPP) -o test $(CFLAGS) -lopenblas -I /cygdrive/e/PROGRAMOK/OpenBLAS/ $(SOURCE)/test.cpp -print-search-dirs
+	$(CPP) -o test $(CFLAGS) -lopenblas -I /cygdrive/e/PROGRAMOK/OpenBLAS/ src/test.cpp
 
-test_cuda: src/test.cpp
-	$(CPP) -o test $(CFLAGS) -DUSE_CUDA $(SOURCE)/test.cpp
+test_cuda: src/test.cpp src/kernel.cu
+	nvcc -o test_cuda $(CUDA_FLAGS) -DUSE_CUDA src/test.cpp src/kernel.cu
 
 clean:
 	rm -f ./test

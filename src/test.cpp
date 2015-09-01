@@ -1,24 +1,42 @@
-
-//#define _USE_MATH_DEFINES
-//
-//#include <math.h>
-//#include <complex>
-
 #include <iostream>
 #include <random>
 #include <complex>
-
-#include "common.h"
-
-#ifndef USE_CUDA
-#	include "cblas.h"
-#else
-#	include "kernels.cuh"
-#endif
+#include <chrono>
 
 #include "aladin/aladin.h"
 
+struct Sizes
+{
+	int row1, col1, col2;
+};
+
+class Timer
+{
+private:
+	typedef std::chrono::high_resolution_clock my_clock;
+	typedef std::chrono::time_point<my_clock> time_point;
+	typedef std::chrono::duration<double> duration_t;
+public:
+	Timer()
+	{
+		tick();
+	}
+	void tick()
+	{
+		start = my_clock::now();
+	}
+	double tack()const
+	{
+		duration_t elapsed_seconds = my_clock::now() - start;
+		return elapsed_seconds.count();
+	}
+
+private:
+	time_point start;
+};
+
 #ifndef USE_CUDA
+#	include "cblas.h"
 
 template<class Type>
 void calculate_prod_reference(const Sizes& sizes, const Type* A, const Type* B, Type* C2, bool transpose);
@@ -69,7 +87,70 @@ template<>
 void calculate_prod_reference<long long>(const Sizes& sizes, const long long* A, const long long* B, long long* C2, bool transpose)
 {
 }
+#else
+#	include "cuda_runtime.h"
+#	include "device_launch_parameters.h"
 
+template<class Type>
+void cuda_prod_imp(int blocks, const Sizes& sizes, const Type* A_dev, const Type* B_dev, Type* C_dev, bool transpose);
+
+template<class Type>
+void calculate_prod_reference(const Sizes& sizes, const Type* A, const Type* B, Type* C, bool transpose)
+{
+	static Type* pointers[] = { nullptr, nullptr, nullptr };
+	static size_t allocatedSizes[] = { 0, 0, 0 };
+	static size_t newSizes[] = { 0, 0, 0 };
+
+	newSizes[0] = sizeof(Type)*sizes.row1*sizes.col1;
+	newSizes[1] = sizeof(Type)*sizes.col1*sizes.col2;
+	newSizes[2] = sizeof(Type)*sizes.row1*sizes.col2;
+
+	for (int i = 0; i < 3; ++i)
+	{
+		if (newSizes[i] == 0)
+			return;
+		if (allocatedSizes[i] < newSizes[i])
+		{
+			if (cudaMalloc(pointers + i, newSizes[i]) == cudaSuccess)
+				allocatedSizes[i] = newSizes[i];
+			else
+			{
+				allocatedSizes[i] = 0;
+				return;
+			}				
+		}
+		if (cudaMemcpy(pointers[i], i == 0 ? A : (i == 1 ? B : C), newSizes[i], cudaMemcpyHostToDevice) != cudaSuccess)
+			return;
+
+	}
+	const auto block_number = (int)ceil((float)sizes.row1*sizes.col2 / 256);
+	cuda_prod_imp(block_number, sizes, pointers[0], pointers[1], pointers[2], transpose);
+
+	for (int i = 0; i < 3; ++i)
+	{
+		cudaMemcpy((void*)(i == 0 ? A : (i == 1 ? B : C)), pointers[i], newSizes[i], cudaMemcpyDeviceToHost);
+	}
+}
+
+#define DECLARATION_MACRO(type, type_name, transpose) \
+void call_cuda_kernel_##type_name##_##transpose(int, const type *a, const type *b, type *c, int row_a, int col_a_row_b, int col_b)
+
+#define DECLARATION_MACRO_BOTH(type, type_name) DECLARATION_MACRO(type, type_name, ); DECLARATION_MACRO(type, type_name, transpose); \
+template<> \
+void cuda_prod_imp(int blocks, const Sizes& sizes, const type* A_dev, const type* B_dev, type* C_dev, bool transpose) \
+{if (transpose) call_cuda_kernel_##type_name##_transpose(blocks, A_dev, B_dev, C_dev, sizes.row1, sizes.col1, sizes.col2); \
+else call_cuda_kernel_##type_name##_(blocks, A_dev, B_dev, C_dev, sizes.row1, sizes.col1, sizes.col2); }
+
+DECLARATION_MACRO_BOTH(float, float)
+DECLARATION_MACRO_BOTH(double, double)
+DECLARATION_MACRO_BOTH(short, short)
+DECLARATION_MACRO_BOTH(int, int)
+DECLARATION_MACRO_BOTH(long long, longlong)
+DECLARATION_MACRO_BOTH(std::complex<float>, complex)
+DECLARATION_MACRO_BOTH(std::complex<double>, complexdouble)
+
+#	undef DECLARATION_MACRO_BOTH
+#	undef DECLARATION_MACRO
 #endif
 
 template<class Type>
@@ -295,10 +376,18 @@ void prod_test(TestEntry& result)
 	result.blas_time = Mean(baseline_times);
 	result.error= Mean(checking_errors);
 
+#ifdef USE_CUDA
+	cudaFreeHost(A);
+	cudaFreeHost(B);
+	cudaFreeHost(C1);
+	cudaFreeHost(C2);
+#else
 	delete[] A;
 	delete[] B;
 	delete[] C1;
 	delete[] C2;
+#endif // USE_CUDA
+
 }
 
 int main(int argc, char* argv[])

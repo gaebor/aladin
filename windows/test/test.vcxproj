@@ -21,9 +21,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\src\test.cpp" />
   </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\inc\common.h" />
-  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{82A93834-089C-4A4D-B090-172F3D330691}</ProjectGuid>
     <RootNamespace>test</RootNamespace>
