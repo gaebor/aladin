@@ -5,10 +5,10 @@ apps = test test_cuda
 all: $(apps)
 
 test: src/test.cpp
-	$(CPP) -o test $(CFLAGS) -lopenblas -I /cygdrive/e/PROGRAMOK/OpenBLAS/ src/test.cpp
+	g++ -o test $(CFLAGS) -lopenblas -I /cygdrive/e/PROGRAMOK/OpenBLAS/ src/test.cpp
 
-test_cuda: src/test.cpp src/kernel.cu
-	nvcc -o test_cuda $(CUDA_FLAGS) -DUSE_CUDA src/test.cpp src/kernel.cu
+test_cuda: src/test.cpp
+	nvcc -o test_cuda $(CUDA_FLAGS) -DUSE_CUDA src/test.cpp -lcublas -lcuda
 
 clean:
 	rm -f ./test
