@@ -42,7 +42,9 @@ private:
 #	include "cblas.h"
 
 template<class Type>
-void calculate_prod_reference(const Sizes& sizes, const Type* A, const Type* B, Type* C2, bool transpose);
+void calculate_prod_reference(const Sizes& sizes, const Type* A, const Type* B, Type* C2, bool transpose)
+{
+}
 
 template<>
 void calculate_prod_reference<double>(const Sizes& sizes, const double* A, const double* B, double* C2, bool transpose)
@@ -50,8 +52,6 @@ void calculate_prod_reference<double>(const Sizes& sizes, const double* A, const
 	if (!transpose)
 		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
 			sizes.row1, sizes.col2, sizes.col1, 1.0, A, sizes.col1, B, sizes.col2, 0.0, C2, sizes.col2);
-		//cblas_dgemm(CblasColMajor, CblasTrans, CblasTrans,
-		//	sizes.col2, sizes.row1, sizes.col1, 1.0, B, sizes.col2, A, sizes.col1, 0.0, C2, sizes.col2);
 	else
 		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
 			sizes.row1, sizes.col2, sizes.col1, 1.0, A, sizes.col1, B, sizes.col1, 0.0, C2, sizes.col2);
@@ -106,27 +106,15 @@ void calculate_prod_reference<std::complex<double>>(const Sizes& sizes, const st
 			beta, reinterpret_cast<double*>(C2), sizes.col2);
 }
 
-template<>
-void calculate_prod_reference<short>(const Sizes& sizes, const short* A, const short* B, short* C2, bool transpose)
-{
-}
-
-template<>
-void calculate_prod_reference<int>(const Sizes& sizes, const int* A, const int* B, int* C2, bool transpose)
-{
-}
-
-template<>
-void calculate_prod_reference<long long>(const Sizes& sizes, const long long* A, const long long* B, long long* C2, bool transpose)
-{
-}
 #else
 #	include "cuda_runtime.h"
 #	include "device_launch_parameters.h"
 #	include "cublas_v2.h"
 
 template<class Type>
-void cuda_prod_imp(cublasHandle_t handle, const Sizes& sizes, const Type* A_dev, const Type* B_dev, Type* C_dev, bool transpose);
+void cuda_prod_imp(cublasHandle_t handle, const Sizes& sizes, const Type* A_dev, const Type* B_dev, Type* C_dev, bool transpose)
+{
+}
 
 template<class Type>
 void calculate_prod_reference(const Sizes& sizes, Type* A, Type* B, Type* C, bool transpose)
@@ -168,23 +156,25 @@ void calculate_prod_reference(const Sizes& sizes, Type* A, Type* B, Type* C, boo
 	cuda_prod_imp(handle, sizes, pointers[0], pointers[1], pointers[2], transpose);
 
 	stat = cublasGetMatrix (sizes.col1, sizes.row1, sizeof(Type), pointers[0], sizes.col1, A, sizes.col1);
-        stat = cublasGetMatrix (sizes.col2, sizes.col1, sizeof(Type), pointers[1], sizes.col2, B, sizes.col2);
-        stat = cublasGetMatrix (sizes.col2, sizes.row1, sizeof(Type), pointers[2], sizes.col2, C, sizes.col2);
+	stat = cublasGetMatrix (sizes.col2, sizes.col1, sizeof(Type), pointers[1], sizes.col2, B, sizes.col2);
+	stat = cublasGetMatrix (sizes.col2, sizes.row1, sizeof(Type), pointers[2], sizes.col2, C, sizes.col2);
 }
 
 template<>
 void cuda_prod_imp(cublasHandle_t handle, const Sizes& sizes, const float* A_dev, const float* B_dev, float* C_dev, bool transpose)
 {
 	static cudaError_t error;
-        static cublasStatus_t stat;
-
+	static cublasStatus_t stat;
 	static const float beta = 0.0f;
 	static const float alpha = 1.0f;
 
+	/************************************************************************/
+	/* HASK ALERT! This is something that you don't want to know            */
+	/************************************************************************/
 	if (transpose)
-		stat = cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_T,sizes.col2, sizes.row1 ,sizes.col1 ,&alpha, B_dev, sizes.col2, A_dev, sizes.col1, &beta, C_dev, sizes.col2);
+		stat = cublasSgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, sizes.col2, sizes.row1, sizes.col1, &alpha, B_dev, sizes.col1, A_dev, sizes.col1, &beta, C_dev, sizes.col2);
 	else
-		stat = cublasSgemm(handle, CUBLAS_OP_T, CUBLAS_OP_T, sizes.col2, sizes.row1 ,sizes.col1 ,&alpha, B_dev, sizes.col2, A_dev, sizes.col1, &beta, C_dev, sizes.col2);
+		stat = cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, sizes.col2, sizes.row1, sizes.col1, &alpha, B_dev, sizes.col2, A_dev, sizes.col1, &beta, C_dev, sizes.col2);
 }
 
 template<>
@@ -192,61 +182,54 @@ void cuda_prod_imp(cublasHandle_t handle, const Sizes& sizes, const double* A_de
 {
         static cudaError_t error;
         static cublasStatus_t stat;
-
         static const double beta = 0.0;
         static const double alpha = 1.0;
 
         if (transpose)
-                stat = cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_T, sizes.col2, sizes.row1 ,sizes.col1 ,&alpha, B_dev, sizes.col2, A_dev, sizes.col1, &beta, C_dev, sizes.col2);
+			stat = cublasDgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, sizes.col2, sizes.row1, sizes.col1, &alpha, B_dev, sizes.col1, A_dev, sizes.col1, &beta, C_dev, sizes.col2);
         else
-                stat = cublasDgemm(handle, CUBLAS_OP_T, CUBLAS_OP_T, sizes.col2, sizes.row1 ,sizes.col1 ,&alpha, B_dev, sizes.col2, A_dev, sizes.col1, &beta, C_dev, sizes.col2);
+			stat = cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, sizes.col2, sizes.row1, sizes.col1, &alpha, B_dev, sizes.col2, A_dev, sizes.col1, &beta, C_dev, sizes.col2);
 }
 
 template<>
 void cuda_prod_imp(cublasHandle_t handle, const Sizes& sizes, const std::complex<float>* A_dev, const std::complex<float>* B_dev, std::complex<float>* C_dev, bool transpose)
 {
-        static cudaError_t error;
-        static cublasStatus_t stat;
+	static cudaError_t error;
+	static cublasStatus_t stat;
+	static const cuComplex beta = { 0.0f, 0.0f };
+	static const cuComplex alpha = { 1.0f , 0.0f };
 
-        static const cuComplex beta = {0,0};
-        static const cuComplex alpha = {1,0};
-
-        if (transpose)
-                stat = cublasCgemm(handle, CUBLAS_OP_N, CUBLAS_OP_T, sizes.col2, sizes.row1 ,sizes.col1 ,&alpha, reinterpret_cast<const cuComplex*>(B_dev), sizes.col2, reinterpret_cast<const cuComplex*>(A_dev), sizes.col1, &beta, reinterpret_cast<cuComplex*>(C_dev), sizes.col2);
-        else
-                stat = cublasCgemm(handle, CUBLAS_OP_T, CUBLAS_OP_T, sizes.col2, sizes.row1 ,sizes.col1 ,&alpha, reinterpret_cast<const cuComplex*>(B_dev), sizes.col2, reinterpret_cast<const cuComplex*>(A_dev), sizes.col1, &beta, reinterpret_cast<cuComplex*>(C_dev), sizes.col2);
+	if (transpose)
+		stat = cublasCgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, sizes.col2, sizes.row1, sizes.col1, &alpha,
+		reinterpret_cast<const cuComplex*>(B_dev), sizes.col1,
+		reinterpret_cast<const cuComplex*>(A_dev), sizes.col1,
+		&beta, reinterpret_cast<cuComplex*>(C_dev), sizes.col2);
+	else
+		stat = cublasCgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, sizes.col2, sizes.row1, sizes.col1, &alpha,
+		reinterpret_cast<const cuComplex*>(B_dev), sizes.col2,
+		reinterpret_cast<const cuComplex*>(A_dev), sizes.col1, &beta,
+		reinterpret_cast<cuComplex*>(C_dev), sizes.col2);
 }
 
 template<>
 void cuda_prod_imp(cublasHandle_t handle, const Sizes& sizes, const std::complex<double>* A_dev, const std::complex<double>* B_dev, std::complex<double>* C_dev, bool transpose)
 {
-        static cudaError_t error;
-        static cublasStatus_t stat;
+	static cudaError_t error;
+	static cublasStatus_t stat;
+	static const cuDoubleComplex beta = { 0.0, 0.0 };
+	static const cuDoubleComplex alpha = { 1.0, 0.0 };
 
-        static const cuDoubleComplex beta = {0,0};
-        static const cuDoubleComplex alpha = {1,0};
-
-        if (transpose)
-		stat = cublasZgemm(handle, CUBLAS_OP_N, CUBLAS_OP_T, sizes.col2, sizes.row1 ,sizes.col1 ,&alpha, reinterpret_cast<const cuDoubleComplex*>(B_dev), sizes.col2, reinterpret_cast<const cuDoubleComplex*>(A_dev), sizes.col1, &beta, reinterpret_cast<cuDoubleComplex*>(C_dev), sizes.col2);
-        else
-                stat = cublasZgemm(handle, CUBLAS_OP_T, CUBLAS_OP_T, sizes.col2, sizes.row1 ,sizes.col1 ,&alpha, reinterpret_cast<const cuDoubleComplex*>(B_dev), sizes.col2, reinterpret_cast<const cuDoubleComplex*>(A_dev), sizes.col1, &beta, reinterpret_cast<cuDoubleComplex*>(C_dev), sizes.col2);
+	if (transpose)
+		stat = cublasZgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, sizes.col2, sizes.row1, sizes.col1, &alpha,
+		reinterpret_cast<const cuDoubleComplex*>(B_dev), sizes.col1,
+		reinterpret_cast<const cuDoubleComplex*>(A_dev), sizes.col1,
+		&beta, reinterpret_cast<cuDoubleComplex*>(C_dev), sizes.col2);
+	else
+		stat = cublasZgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, sizes.col2, sizes.row1, sizes.col1, &alpha,
+		reinterpret_cast<const cuDoubleComplex*>(B_dev), sizes.col2,
+		reinterpret_cast<const cuDoubleComplex*>(A_dev), sizes.col1, &beta,
+		reinterpret_cast<cuDoubleComplex*>(C_dev), sizes.col2);
 }
-
-template<>
-void cuda_prod_imp(cublasHandle_t handle, const Sizes& sizes, const short* A_dev, const short* B_dev, short* C_dev, bool)
-{
-}
-
-template<>
-void cuda_prod_imp(cublasHandle_t handle, const Sizes& sizes, const int* A_dev, const int* B_dev, int* C_dev, bool)
-{
-}
-
-template<>
-void cuda_prod_imp(cublasHandle_t handle, const Sizes& sizes, const long long* A_dev, const long long* B_dev, long long* C_dev, bool)
-{
-}
-
 
 #endif
 
