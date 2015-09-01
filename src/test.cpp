@@ -3,6 +3,8 @@
 #include <complex>
 #include <chrono>
 
+#include <string.h>
+
 #include "aladin/aladin.h"
 
 struct Sizes
