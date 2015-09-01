@@ -7,6 +7,7 @@
 
 #include "aladin/aladin.h"
 
+
 struct Sizes
 {
 	int row1, col1, col2;
@@ -46,33 +47,63 @@ void calculate_prod_reference(const Sizes& sizes, const Type* A, const Type* B, 
 template<>
 void calculate_prod_reference<double>(const Sizes& sizes, const double* A, const double* B, double* C2, bool transpose)
 {
-	cblas_dgemm(CblasRowMajor, CblasNoTrans, transpose ? CblasTrans : CblasNoTrans,
-		sizes.row1, sizes.col2, sizes.col1, 1.0, A, sizes.col1, B, sizes.col2, 0.0, C2, sizes.col2);
+	if (!transpose)
+		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+			sizes.row1, sizes.col2, sizes.col1, 1.0, A, sizes.col1, B, sizes.col2, 0.0, C2, sizes.col2);
+		//cblas_dgemm(CblasColMajor, CblasTrans, CblasTrans,
+		//	sizes.col2, sizes.row1, sizes.col1, 1.0, B, sizes.col2, A, sizes.col1, 0.0, C2, sizes.col2);
+	else
+		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+			sizes.row1, sizes.col2, sizes.col1, 1.0, A, sizes.col1, B, sizes.col1, 0.0, C2, sizes.col2);
 }
 
 template<>
 void calculate_prod_reference<float>(const Sizes& sizes, const float* A, const float* B, float* C2, bool transpose)
 {
-	cblas_sgemm(CblasRowMajor, CblasNoTrans, transpose ? CblasTrans : CblasNoTrans,
-		sizes.row1, sizes.col2, sizes.col1, 1.0, A, sizes.col1, B, sizes.col2, 0.0, C2, sizes.col2);
+	if (!transpose)
+		cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+			sizes.row1, sizes.col2, sizes.col1, 1.0, A, sizes.col1, B, sizes.col2, 0.0, C2, sizes.col2);
+	else
+		cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+			sizes.row1, sizes.col2, sizes.col1, 1.0, A, sizes.col1, B, sizes.col1, 0.0, C2, sizes.col2);
 }
 
 template<>
 void calculate_prod_reference<std::complex<float>>(const Sizes& sizes, const std::complex<float>* A, const std::complex<float>* B, std::complex<float>* C2, bool transpose)
 {
-	float alpha = 1.0;
-	float beta = 0.0;
-	cblas_cgemm(CblasRowMajor, CblasNoTrans, transpose ? CblasTrans : CblasNoTrans,
-		sizes.row1, sizes.col2, sizes.col1, &alpha, reinterpret_cast<const float*>(A), sizes.col1, reinterpret_cast<const float*>(B), sizes.col2, &beta, reinterpret_cast<float*>(C2), sizes.col2);
+	static const float alpha[] = { 1.0f , 0.0f};
+	static const float beta[] = { 0.0f, 0.0f };
+	if (!transpose)
+		cblas_cgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+			sizes.row1, sizes.col2, sizes.col1, alpha,
+			reinterpret_cast<const float*>(A), sizes.col1,
+			reinterpret_cast<const float*>(B), sizes.col2,
+			beta, reinterpret_cast<float*>(C2), sizes.col2);
+	else
+		cblas_cgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+			sizes.row1, sizes.col2, sizes.col1, alpha,
+			reinterpret_cast<const float*>(A), sizes.col1,
+			reinterpret_cast<const float*>(B), sizes.col1,
+			beta, reinterpret_cast<float*>(C2), sizes.col2);
 }
 
 template<>
 void calculate_prod_reference<std::complex<double>>(const Sizes& sizes, const std::complex<double>* A, const std::complex<double>* B, std::complex<double>* C2, bool transpose)
 {
-	double alpha = 1.0;
-	double beta = 0.0;
-	cblas_zgemm(CblasRowMajor, CblasNoTrans, transpose ? CblasTrans : CblasNoTrans,
-		sizes.row1, sizes.col2, sizes.col1, &alpha, reinterpret_cast<const double*>(A), sizes.col1, reinterpret_cast<const double*>(B), sizes.col2, &beta, reinterpret_cast<double*>(C2), sizes.col2);
+	static const double alpha[] = { 1.0, 0.0 };
+	static const double beta[] = { 0.0, 0.0 };
+	if (!transpose)
+		cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+			sizes.row1, sizes.col2, sizes.col1, alpha,
+			reinterpret_cast<const double*>(A), sizes.col1,
+			reinterpret_cast<const double*>(B), sizes.col2,
+			beta, reinterpret_cast<double*>(C2), sizes.col2);
+	else
+		cblas_zgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+			sizes.row1, sizes.col2, sizes.col1, alpha,
+			reinterpret_cast<const double*>(A), sizes.col1,
+			reinterpret_cast<const double*>(B), sizes.col1,
+			beta, reinterpret_cast<double*>(C2), sizes.col2);
 }
 
 template<>
@@ -256,17 +287,35 @@ template<class Type>
 void init_matrices(Type* A, Type*B, const Sizes& sizes);
 
 template<class Type>
+void init_matrices_float(Type* A, Type* B, const Sizes& sizes)
+{
+	static std::random_device rd;
+	static std::default_random_engine generator(rd());
+	static std::uniform_real_distribution<Type> distribution(-1.0, 1.0);
+	for (int i = 0; i < sizes.row1*sizes.col1; ++i)
+	{
+		A[i] = distribution(generator);
+	}
+	for (int i = 0; i < sizes.col1*sizes.col2; ++i)
+	{
+		B[i] = distribution(generator);
+	}
+}
+
+template<class Type>
 void init_matrices(Type* A, Type*B, const Sizes& sizes)
 {
 	static std::random_device rd;
 	static std::default_random_engine generator(rd());
-	static std::uniform_real_distribution<Type> distribution(-10,10);
-
+	static std::uniform_int_distribution<Type> distribution(-10, 10);
 	for (int i = 0; i < sizes.row1*sizes.col1; ++i)
+	{
 		A[i] = distribution(generator);
-
+	}
 	for (int i = 0; i < sizes.col1*sizes.col2; ++i)
+	{
 		B[i] = distribution(generator);
+	}
 }
 
 template<>
@@ -274,7 +323,7 @@ void init_matrices<std::complex<float>>(std::complex<float>* A, std::complex<flo
 {
 	static std::random_device rd;
 	static std::default_random_engine generator(rd());
-	static std::uniform_real_distribution<float> distribution(-10,10);
+	static std::uniform_real_distribution<float> distribution(-1.0f,1.0f);
 
 	for (int i = 0; i < sizes.row1*sizes.col1; ++i)
 	{
@@ -294,7 +343,7 @@ void init_matrices<std::complex<double>>(std::complex<double>* A, std::complex<d
 {
 	static std::random_device rd;
 	static std::default_random_engine generator(rd());
-	static std::uniform_real_distribution<double> distribution(-10,10);
+	static std::uniform_real_distribution<double> distribution(-1.0, 1.0);
 
 	for (int i = 0; i < sizes.row1*sizes.col1; ++i)
 	{
@@ -310,17 +359,16 @@ void init_matrices<std::complex<double>>(std::complex<double>* A, std::complex<d
 }
 
 template<>
-void init_matrices<short>(short* A, short*B, const Sizes& sizes)
+void init_matrices<float>(float* A, float*B, const Sizes& sizes)
 {
 	static std::random_device rd;
 	static std::default_random_engine generator(rd());
-	static std::uniform_int_distribution<short> distribution(-10,10);
+	static std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
 
 	for (int i = 0; i < sizes.row1*sizes.col1; ++i)
 	{
 		A[i] = distribution(generator);
 	}
-
 	for (int i = 0; i < sizes.col1*sizes.col2; ++i)
 	{
 		B[i] = distribution(generator);
@@ -328,35 +376,16 @@ void init_matrices<short>(short* A, short*B, const Sizes& sizes)
 }
 
 template<>
-void init_matrices<int>(int* A, int*B, const Sizes& sizes)
+void init_matrices<double>(double* A, double*B, const Sizes& sizes)
 {
 	static std::random_device rd;
 	static std::default_random_engine generator(rd());
-	static std::uniform_int_distribution<int> distribution(-10,10);
+	static std::uniform_real_distribution<double> distribution(-1.0, 1.0);
 
 	for (int i = 0; i < sizes.row1*sizes.col1; ++i)
 	{
 		A[i] = distribution(generator);
 	}
-
-	for (int i = 0; i < sizes.col1*sizes.col2; ++i)
-	{
-		B[i] = distribution(generator);
-	}
-}
-
-template<>
-void init_matrices<long long>(long long* A, long long*B, const Sizes& sizes)
-{
-	static std::random_device rd;
-	static std::default_random_engine generator(rd());
-	static std::uniform_int_distribution<long long> distribution(-10,10);
-
-	for (int i = 0; i < sizes.row1*sizes.col1; ++i)
-	{
-		A[i] = distribution(generator);
-	}
-
 	for (int i = 0; i < sizes.col1*sizes.col2; ++i)
 	{
 		B[i] = distribution(generator);
@@ -383,6 +412,13 @@ void prod_test(TestEntry& result)
 	B = new Type[sizes.col1*sizes.col2];
 	C1 = new Type[sizes.row1*sizes.col2];
 	C2 = new Type[sizes.row1*sizes.col2];
+
+	if (A==nullptr || B == nullptr || C1 == nullptr || C2 == nullptr)
+	{
+		std::cerr << "unable to allocate memory" << std::endl;
+		return;
+	}
+	std::cout << "aladin time\tblas time\terror" << std::endl;
 #else
 
 	cudaError_t cuda_error;
@@ -410,6 +446,7 @@ void prod_test(TestEntry& result)
 		std::cerr << "Unable to allocate pinned memory" << std::endl;
 		return;
 	}
+	std::cout << "aladin time\tgpu time\terror" << std::endl;
 #endif
 
 	for (size_t e = 0; e < result.epochs; ++e)
@@ -480,7 +517,25 @@ int main(int argc, char* argv[])
 
 	for( ; *argv != NULL; ++argv)
 	{
-		if (strcmp(*argv, "-s") == 0)
+		if (strcmp(*argv, "--help") == 0)
+		{
+			std::cout << "this is a performance test app, usage: test [options]" << std::endl;
+			std::cout << "options:" << std::endl;
+			std::cout << "\t-s int [int int]\tsize of matrices.\n\t\tIf one positive number follows this option, then square matrices are obtained." <<
+				"\n\t\tIf 3 positive numbers follow like \"-s n k m\" then A=n*k, B=k*m, A*B=n*m." << 
+				"\n\t\tDefault is: -s " << test.sizes.row1 << " " << test.sizes.col1 << " " << test.sizes.col2  << std::endl;
+			std::cout << "\t-t int\tthreads, default is: " << test.threads << std::endl;
+			std::cout << "\t-e int\tepoch, number of identical tests, default is: " << test.epochs<< std::endl;
+			std::cout << "\t-h\ttranspose, A*B' is calculated, default is " << (test.transpose ? "enabled" : "disabled") << std::endl;
+			std::cout << "\t\trest of the parameters specify the type, it can be:\n";
+			for (auto s : { "float", "double", "complex", "complexdouble", "short", "int", "longlong" })
+			{
+				std::cout << "\t\t" << s << "\n";
+			}
+			std::cout << "\t\tdefault type is \"" << type <<"\"" << std::endl;
+			return 1;
+		}
+		else if (strcmp(*argv, "-s") == 0)
 		{
 			int n = 0; //number of integers after -s flag until any other flag
 			std::vector<int> s(argc);

@@ -15,8 +15,6 @@
 #include "aladin/TemplateLibrary.h"
 #include "aladin/linear_algebraic_structures.h"
 
-
-
 #ifndef min
 #	define min(x,y) (((x) < (y)) ? (x) : (y))
 #	define MIN_HAS_BEEN_DEFINED_IN_ALADIN
