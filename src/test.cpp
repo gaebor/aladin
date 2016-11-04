@@ -4,9 +4,9 @@
 #include <chrono>
 
 #include <string.h>
+#include <math.h>
 
 #include "aladin/aladin.h"
-
 
 struct Sizes
 {
@@ -440,10 +440,10 @@ void prod_test(TestEntry& result)
 		if (result.transpose)
 		{
 			aladin::gemm_t<false>(aladin::make_header(A, sizes.row1, sizes.col1), aladin::make_header(B, sizes.col2, sizes.col1), aladin::make_header(C1, sizes.row1, sizes.col2),
-				[](Type& one, const Type& other){one += other;}, [](const Type& one, const Type& other){return one*other;});
+				[](Type& result, const Type& one, const Type& other){result += one * other; });
 		}else{
 			aladin::gemm_rowwise<false>(aladin::make_header(A, sizes.row1, sizes.col1), aladin::make_header(B, sizes.col1, sizes.col2), aladin::make_header(C1, sizes.row1, sizes.col2),
-				[](Type& one, const Type& other){one += other;}, [](const Type& one, const Type& other){return one*other;},
+				[](Type& result, const Type& one, const Type& other){result += one * other; },
 				result.threads);
 		}
 		calculation_times.push_back(timer.tack());

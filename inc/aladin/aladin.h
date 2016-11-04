@@ -23,10 +23,9 @@
 namespace aladin{
 
 //!computes A*B
-template<bool add, class Number, class Add, class Mul>
+template<bool add, class Number, class FMA>
 bool gemm(const MatrixHeader<Number> mat1, const MatrixHeader<Number> mat2, const MatrixHeader<Number> result,
-				Add add_f,
-				Mul mul_f)
+				FMA fma_f)
 {
 	if (mat1.cols != mat2.rows || result.rows != mat1.rows || result.cols != mat2.cols)
 		return false;
@@ -53,7 +52,8 @@ bool gemm(const MatrixHeader<Number> mat1, const MatrixHeader<Number> mat2, cons
 
 			for (k = 0; k < mat1.cols; ++k, A_dot_ptr += mat1.col_step, B_dot_ptr += mat2.row_step)
 			{
-				add_f(thiselement, mul_f(*A_dot_ptr,*B_dot_ptr));
+				// z += x*y
+				fma_f(thiselement, *A_dot_ptr, *B_dot_ptr);
 			}
 		}
 	}
@@ -61,10 +61,9 @@ bool gemm(const MatrixHeader<Number> mat1, const MatrixHeader<Number> mat2, cons
 }
 
 //!computes A*B^T
-template<bool add, class Number, class Add, class Mul>
+template<bool add, class Number, class FMA>
 bool gemm_t(const MatrixHeader<Number> mat1, const MatrixHeader<Number> mat2, const MatrixHeader<Number> result,
-				 Add add_f,
-				 Mul mul_f)
+				 FMA fma_f)
 {
 	if (mat1.cols != mat2.cols || result.rows != mat1.rows || result.cols != mat2.rows)
 		return false;
@@ -91,7 +90,8 @@ bool gemm_t(const MatrixHeader<Number> mat1, const MatrixHeader<Number> mat2, co
 
 			for (k = 0; k < mat1.cols; ++k, A_dot_ptr += mat1.col_step, B_dot_ptr += mat2.col_step)
 			{
-				add_f(thiselement, mul_f(*A_dot_ptr,*B_dot_ptr));
+				// z += x*y
+				fma_f(thiselement, *A_dot_ptr, *B_dot_ptr);
 			}
 		}
 	}
@@ -99,11 +99,9 @@ bool gemm_t(const MatrixHeader<Number> mat1, const MatrixHeader<Number> mat2, co
 }
 
 //!computes A*B, threadded
-template<bool add, class Number, class Add, class Mul>
+template<bool add, class Number, class FMA>
 bool gemm_rowwise(const MatrixHeader<Number> mat1, const MatrixHeader<Number> mat2, const MatrixHeader<Number> result,
-						 Add add_f,
-						 Mul mul_f,
-						 size_t thread_number = 1)
+						FMA fma_f, size_t thread_number = 1)
 {
 	std::vector<std::shared_ptr<std::thread>> threads(thread_number, nullptr);
 	std::vector<bool> thread_results(thread_number, false);
@@ -120,7 +118,7 @@ bool gemm_rowwise(const MatrixHeader<Number> mat1, const MatrixHeader<Number> ma
 			auto a = aladin::make_header(&mat1(start_row, 0), row_number, mat1.cols, mat1.row_step, mat1.col_step);
 			auto b = mat2;
 			auto c = aladin::make_header(&result(start_row, 0), row_number, result.cols, result.row_step, result.col_step);
-			thread_results[id] = aladin::gemm<add>(a, b, c, add_f, mul_f);
+			thread_results[id] = aladin::gemm<add>(a, b, c, fma_f);
 		}, thread_id
 			));
 		++thread_id;
@@ -167,7 +165,7 @@ size_t solve(const MatrixHeader<Number> mat,
 	return min(mat.rows, mat.cols);
 }
 
-////!gaussian elimination
+////!Gaussian elimination
 //template<class Number>
 //static Number* inverse(Number* mat, const size_t rows)
 //{
@@ -195,7 +193,7 @@ size_t solve(const MatrixHeader<Number> mat,
 //	}
 //}
 //
-////!gaussian elimination
+////!Gaussian elimination
 //template<class Number>
 //static size_t solve(Number* mat1, Number* mat2, const size_t rows, const size_t cols1, const size_t cols2)
 //{
