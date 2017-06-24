@@ -1,10 +1,10 @@
-CFLAGS+= -Iinc -pthread -std=c++11 -O3 -march=native -Wall
+CFLAGS+= -Iinc -std=c++11 -O3
 apps = test test_cuda
 
 all: $(apps)
 
 test: src/test.cpp
-	g++ -o test $(CFLAGS) src/test.cpp -lopenblas
+	g++ -o test $(CFLAGS) -Wall -march=native src/test.cpp -pthread -lopenblas
 
 test_cuda: src/test.cpp
 	nvcc -o test_cuda $(CFLAGS) -DUSE_CUDA src/test.cpp -lcublas -lcuda
