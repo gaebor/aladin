@@ -488,6 +488,8 @@ int main(int argc, char* argv[])
 	test.epochs = 10;
 	std::string type = "double";
 	
+    const char* const runtime_name = argv[0];
+    
 	++argv; //name of executable
 
 #ifdef USE_CUDA
@@ -497,12 +499,12 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 #endif
-
+    
 	for( ; *argv != NULL; ++argv)
 	{
 		if (strcmp(*argv, "--help") == 0)
 		{
-			std::cout << "this is a performance test app, usage: test [options]" << std::endl;
+			std::cout << "this is a performance test app, usage: " << runtime_name << " [options]" << std::endl;
 			std::cout << "options:" << std::endl;
 			std::cout << "\t-s int [int int]\tsize of matrices.\n\t\tIf one positive number follows this option, then square matrices are obtained." <<
 				"\n\t\tIf 3 positive numbers follow like \"-s n k m\" then A=n*k, B=k*m, A*B=n*m." << 
