@@ -8,8 +8,6 @@
 
 #include "aladin/aladin.h"
 
-#include <cblas.h>
-
 struct Sizes
 {
 	int row1, col1, col2;
@@ -41,7 +39,7 @@ private:
 };
 
 #ifndef USE_CUDA
-#	include "cblas.h"
+#	include <cblas.h>
 
 template<class Type>
 void calculate_prod_reference(const Sizes& sizes, const Type* A, const Type* B, Type* C2, bool transpose)
