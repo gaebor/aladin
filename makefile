@@ -1,4 +1,4 @@
-CFLAGS = -Iinc -lm -lpthread -std=c++11 -O3 -march=native -Wall
+CFLAGS+= -Iinc -lm -pthread -std=c++11 -O3 -march=native -Wall
 CUDA_FLAGS = -Iinc -lm -std=c++11 -O3
 apps = test test_cuda
 

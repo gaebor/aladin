@@ -8,6 +8,8 @@
 
 #include "aladin/aladin.h"
 
+#include <cblas.h>
+
 struct Sizes
 {
 	int row1, col1, col2;
