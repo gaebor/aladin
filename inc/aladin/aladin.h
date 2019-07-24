@@ -33,29 +33,28 @@ bool gemm(const MatrixHeader<Number> mat1, const MatrixHeader<Number> mat2, cons
 	auto result_ptr = result.ptr;
 	auto A_ptr = mat1.ptr;
 	auto B_ptr = mat2.ptr;
-	auto A_dot_ptr = A_ptr;
-	auto B_dot_ptr = B_ptr;
-	const SIGNED_INT result_row_step = result.step_at_eor();
+	Number* result_dot_ptr;
+	const Number* B_dot_ptr;
 
 	size_t i,j,k;
 
-	for (i = 0; i < result.rows; ++i, result_ptr += result_row_step, A_ptr += mat1.row_step, B_ptr = mat2.ptr)
+    if (!add)
+    {
+        std::fill(result_ptr, result.ptr + result.rows*result.cols, Number(0));
+    }
+
+	for (i = 0; i < result.rows; ++i, result_ptr += result.row_step, B_ptr = mat2.ptr)
 	{
-		for (j = 0; j < result.cols; ++j, result_ptr += result.col_step, B_ptr += mat2.col_step)
-		{
-			auto& thiselement = *result_ptr;
-			if (!add)
-				thiselement = 0;
-
-			A_dot_ptr = A_ptr;
-			B_dot_ptr = B_ptr;
-
-			for (k = 0; k < mat1.cols; ++k, A_dot_ptr += mat1.col_step, B_dot_ptr += mat2.row_step)
-			{
-				// z += x*y
-				fma_f(thiselement, *A_dot_ptr, *B_dot_ptr);
-			}
-		}
+        for (k = 0; k < mat1.cols; ++k, ++A_ptr, B_ptr += mat2.row_step)
+        {
+            result_dot_ptr = result_ptr;
+            B_dot_ptr = B_ptr;
+            for (j = 0; j < result.cols; ++j, ++result_dot_ptr, ++B_dot_ptr)
+            {
+                fma_f(*result_dot_ptr, *A_ptr, *B_dot_ptr);
+            }
+        }
+		
 	}
 	return true;
 }

@@ -442,9 +442,8 @@ void prod_test(TestEntry& result)
 			aladin::gemm_t<false>(aladin::make_header(A, sizes.row1, sizes.col1), aladin::make_header(B, sizes.col2, sizes.col1), aladin::make_header(C1, sizes.row1, sizes.col2),
 				[](Type& result, const Type& one, const Type& other){result += one * other; });
 		}else{
-			aladin::gemm_rowwise<false>(aladin::make_header(A, sizes.row1, sizes.col1), aladin::make_header(B, sizes.col1, sizes.col2), aladin::make_header(C1, sizes.row1, sizes.col2),
-				[](Type& result, const Type& one, const Type& other){result += one * other; },
-				result.threads);
+			aladin::gemm<false>(aladin::make_header(A, sizes.row1, sizes.col1), aladin::make_header(B, sizes.col1, sizes.col2), aladin::make_header(C1, sizes.row1, sizes.col2),
+				[](Type& result, const Type& one, const Type& other){result += one * other; });
 		}
 		calculation_times.push_back(timer.tack());
 
